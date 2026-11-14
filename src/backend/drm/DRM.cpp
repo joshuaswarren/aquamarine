@@ -35,6 +35,7 @@ extern "C" {
 
 #include "Props.hpp"
 #include "FormatUtils.hpp"
+#include "ScanoutAlias.hpp"
 #include "Shared.hpp"
 #include "hwdata.hpp"
 #include "Renderer.hpp"
@@ -2545,9 +2546,11 @@ bool Aquamarine::CDRMOutput::commitState(bool onlyTest) {
 
     if (COMMITTED & COutputState::eOutputStateProperties::AQ_OUTPUT_STATE_FORMAT) {
         // verify the format is valid for the primary plane
-        bool ok = false;
-        for (auto const& f : getRenderFormats()) {
-            if (f.drmFormat == STATE.drmFormat || f.drmFormat == opaqueToAlphaFormat(STATE.drmFormat)) {
+        const auto FORMATS = getRenderFormats();
+        const auto ALIAS   = scanoutAlphaAlias(FORMATS, STATE.drmFormat, true, false);
+        bool       ok      = false;
+        for (auto const& f : FORMATS) {
+            if (f.drmFormat == STATE.drmFormat || f.drmFormat == ALIAS) {
                 ok = true;
                 break;
             }
@@ -2767,7 +2770,8 @@ bool Aquamarine::CDRMOutput::commitState(bool onlyTest) {
     // sometimes, our consumer could f up the swapchain format and change it without the state changing
     bool formatMismatch = false;
     if (data.mainFB) {
-        if (const auto params = data.mainFB->buffer->dmabuf(); params.success && params.format != STATE.drmFormat && params.format != opaqueToAlphaFormat(STATE.drmFormat)) {
+        if (const auto params = data.mainFB->buffer->dmabuf(); params.success && params.format != STATE.drmFormat &&
+            !scanoutAlphaAliasAccepted(getRenderFormats(), STATE.drmFormat, params.format, true, false)) {
             // formats mismatch. Update the state format and roll with it
             backend->backend->log(AQ_LOG_WARNING,
                                   std::format("drm: Formats mismatch in commit, buffer is {} but output is set to {}. Modesetting to {}", fourccToName(params.format),
@@ -3167,7 +3171,7 @@ Aquamarine::IOutput::SCommitSubmission Aquamarine::CDRMOutput::commitAsync(const
 
     const auto MAIN_BUFFER = data.mainFB ? data.mainFB->buffer.lock() : nullptr;
     const auto ATTRS       = MAIN_BUFFER ? MAIN_BUFFER->dmabuf() : SDMABUFAttrs{};
-    if (ATTRS.success && ATTRS.format != STATE.drmFormat && ATTRS.format != opaqueToAlphaFormat(STATE.drmFormat))
+    if (ATTRS.success && ATTRS.format != STATE.drmFormat && !scanoutAlphaAliasAccepted(getRenderFormats(), STATE.drmFormat, ATTRS.format, true, false))
         return {.error = ENOTSUP};
 
     if (options.lateCursor && cursorVisible && connector->crtc->cursor)

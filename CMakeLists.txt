@@ -167,6 +167,15 @@ add_test(
   COMMAND commitThread "commitThread")
 add_dependencies(tests commitThread)
 
+add_executable(scanoutAlias "tests/ScanoutAlias.cpp")
+target_include_directories(scanoutAlias PRIVATE "./src/include" "./include")
+target_link_libraries(scanoutAlias PRIVATE PkgConfig::deps)
+add_test(
+  NAME "scanoutAlias"
+  WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}/tests
+  COMMAND scanoutAlias)
+add_dependencies(tests scanoutAlias)
+
 # Installation
 install(TARGETS aquamarine)
 install(DIRECTORY "include/aquamarine" DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
